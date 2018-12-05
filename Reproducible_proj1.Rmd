@@ -1,0 +1,103 @@
+---
+title: Reproducible Research 
+output:
+  html_document:
+  md_document:
+    variant: markdown_github
+---
+
+Week 2 Course Project 1
+=========================
+install and library packages
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+```
+
+1. Load data activity.csv
+```{r}
+activity<-read.csv("activity.csv")
+activity_nna<-activity %>% 
+  na.omit()
+str(activity)
+summary(activity)
+activity_byday<-activity_nna %>% 
+    group_by(date) %>% 
+    summarise(sum_steps=sum(steps))
+
+```
+
+2. Histogram of the total number of steps taken each day
+```{r}
+ggplot(data=activity_byday,aes(x=sum_steps)) +
+  geom_histogram()+
+  xlab("Total number of steps each day")
+```
+  
+3. Mean and median number of steps taken each day
+```{r}
+mean<-mean(activity_byday$sum_steps)
+median<-median(activity_byday$sum_steps)
+paste("Mean number of steps each day is", mean, sep=" ")
+paste("Median number of steps each day is", median, sep=" ")
+```
+4. Time series plot of the average number of steps taken
+```{r}
+activity_interval<-activity_nna %>% 
+    group_by(interval) %>% 
+    summarise(mean_steps=mean(steps))
+ggplot(data=activity_interval,aes(x=interval, y=mean_steps)) +
+  geom_line()
+```
+
+5. The 5_minute interval that contains the max number of steps
+```{r}
+max_steps<-max(activity_interval$mean_steps)
+max_interval<-activity_interval[activity_interval$mean_steps==max_steps,]$interval
+paste('Max steps is', max_steps, sep=" ")
+paste('Max interval is',max_interval, sep=" ")
+```
+
+6. Imputing missing data
+Since there are missing data for some of the days, it is not feasible to impute the missing values with the mean steps that day. So I use the mean steps for the 5-minute interval. The data is available in activity_merge dataset.
+```{r}
+#number of rows with missing values
+nrow(activity)-nrow(activity_nna)
+#merge the dataset with mean steps for the 5 minute interval with the original dataset
+activity_merge<-merge(activity,activity_interval)
+#Relace NA with the mean steps for the 5 minute interval
+activity_merge$steps[is.na(activity_merge$steps)]<-activity_merge$mean_steps[is.na(activity_merge$steps)]
+```
+
+7. Histogram of total number os steps taken after imputation of missing values
+```{r}
+activity_byday2<-activity_merge %>% 
+    group_by(date) %>% 
+    summarise(sum_steps=sum(steps))
+ggplot(data=activity_byday2,aes(x=sum_steps)) +
+  geom_histogram()+
+  xlab("Total number of steps each day")+
+  ggtitle("Total number of steps each day after missing values are imputated")
+#mean and median total number of steps per day
+mean(activity_byday2$sum_steps)
+median(activity_byday2$sum_steps)
+# mean and median total number of steps per day are different from that calculated before missing values have been imputed
+```
+
+8. Panel plot comparing the average number of stps taken per 5-minute interval across weekdays and weekends
+```{r}
+#add new variable "day" with two levels-"Weekday" and "Weekend"
+activity_merge$weekday<-weekdays(as.Date(activity_merge$date))
+activity_merge$day<-ifelse(activity_merge$weekday=="Saturday"|activity_merge$weekday=="Sunday","Weekend","Weekday")
+#calculate average steps by interval and weekday/weekend
+activity_new<-activity_merge %>% 
+    group_by(day,interval) %>% 
+    summarise(mean_steps=mean(steps))
+#make the plot
+ggplot(data=activity_new,aes(x=interval, y=mean_steps,color=day)) +
+  geom_line() +
+  facet_grid(day ~ .)+
+  labs(title="Average Steps by Interval and Weekday/Weekend", x="5-Minute Interval", y="Average steps")
+```
+
